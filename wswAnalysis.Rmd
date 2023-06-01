@@ -1,0 +1,801 @@
+---
+title: "WSW"
+author: "Marco Biella"
+date: "2022-11-24"
+output:
+  pdf_document: default
+header-includes:  
+- \usepackage{lscape}  
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE, comment = "", warning = FALSE, message = FALSE)
+```
+
+```{r}
+rm(list = ls())
+
+library(tidyverse)
+library(ggradar)
+library(ggpubr)
+library(ggplot2)
+library(ggmosaic)
+library(patchwork)
+library(ggrepel)
+library(usedist)
+library(bayestestR)
+library(bayesplot)
+library(brms)
+library(qgraph)
+library(bootnet)
+library(NetworkComparisonTest)
+library(gt)
+library(IsingFit)
+
+recode_01 <- function(vct, yes = 1, no = 2, offset = -1){
+  vct <- -(vct - (yes + no))
+  if(!is.null(offset)){
+    vct <- vct + offset
+    }
+  return(vct)
+}
+
+apa <- function(x, title = " ") {
+  gt(x) %>%
+  tab_options(
+    table.border.top.color = "white",
+    heading.title.font.size = px(16),
+    column_labels.border.top.width = 3,
+    column_labels.border.top.color = "black",
+    column_labels.border.bottom.width = 3,
+    column_labels.border.bottom.color = "black",
+    table_body.border.bottom.color = "black",
+    table.border.bottom.color = "white",
+    table.width = pct(100),
+    table.background.color = "white"
+  ) %>%
+  cols_align(align="center") %>%
+  tab_style(
+    style = list(
+      cell_borders(
+        sides = c("top", "bottom"),
+        color = "white",
+        weight = px(1)
+      ),
+      cell_text(
+        align="center"
+      ),
+      cell_fill(color = "white", alpha = NULL)
+      ),
+    locations = cells_body(
+      columns = everything(),
+      rows = everything()
+    )
+  ) %>%
+    #title setup
+    tab_header(
+    title = html("<i>", title, "</i>")
+  ) %>%
+  opt_align_table_header(align = "left")
+}
+```
+
+```{r}
+dat <- read_csv2(file = "wswSexualPractices.csv",
+               ) %>%
+  #filter valid and consent
+  dplyr::filter(consent == 1) %>%
+  #trim variables
+  mutate(id = 1:n()) %>%
+  dplyr::select(
+    id,
+    age, relation, edu, 
+    WSW, sex_attr, rom_attr, self_def, 
+    LIHS_1, LIHS_2, LIHS_3, LIHS_4, LIHS_5, LIHS_6, LIHS_7, LIHS_8, 
+    LIHS_9, LIHS_10, LIHS_11, LIHS_12, 
+    SQoL_1, SQoL_2, SQoL_3, SQoL_4, SQoL_5, SQoL_6, SQoL_7, SQoL_8, 
+    SQoL_9, SQoL_10, SQoL_11, SQoL_12, SQoL_13, SQoL_14, SQoL_15, 
+    SQoL_16, SQoL_17, SQoL_18, 
+    insertive, insertive_no, insertive_yes_1_1, insertive_yes_1_2,
+    insertive_yes_1_3, insertive_yes_1_4, insertive_yes_1_5, insertive_yes_1_6, 
+    oral, oral_no, oral_yes_1_1, oral_yes_1_2, oral_yes_1_3, oral_yes_1_4, 
+    oral_yes_1_5, oral_yes_1_6, 
+    masturbation, masturbation_no, masturbation_yes_1_1, masturbation_yes_1_2, 
+    masturbation_yes_1_3, masturbation_yes_1_4, masturbation_yes_1_5, 
+    masturbation_yes_1_6, 
+    finger, finger_no, finger_yes_1_1, finger_yes_1_2, finger_yes_1_3, 
+    finger_yes_1_4, finger_yes_1_5, finger_yes_1_6, 
+    anal, anal_no, anal_yes_1_1, anal_yes_1_2, anal_yes_1_3, anal_yes_1_4, 
+    anal_yes_1_5, anal_yes_1_6, 
+    petting_no, petting_1, petting_2, petting_3,
+    petting_yes_1_1, petting_yes_1_2, petting_yes_1_3, petting_yes_1_4, petting_yes_1_5, 
+    intercrural, intercrural_no, intercrural_yes_1_1, intercrural_yes_1_2, 
+    intercrural_yes_1_3, intercrural_yes_1_4, intercrural_yes_1_5, 
+    kink, kink_no, kink_yes_1_1, kink_yes_1_2, kink_yes_1_3, kink_yes_1_4,
+    kink_yes_1_5, kink_yes_1_6, 
+    kink_practices_1, kink_practices_2, kink_practices_3, kink_practices_4, 
+    kink_practices_5, kink_practices_6, kink_practices_7, kink_practices_8, 
+    kink_practices_9, kink_practices_10, kink_practices_11, kink_practices_12, 
+    kink_practices_13, kink_practices_14, kink_practices_15, kink_practices_16, 
+    kink_practices_17, kink_practices_18, kink_practices_19, kink_practices_20, 
+    kink_practices_21, kink_practices_22, kink_practices_23, kink_practices_24, 
+    kink_practices_25, kink_practices_26, kink_practices_27, kink_practices_28, 
+    kink_practices_29, 
+    chemsex, chemsex_no, chemsex_yes_1_1, chemsex_yes_1_2, chemsex_yes_1_3, 
+    chemsex_yes_1_4, chemsex_yes_1_5, chemsex_yes_1_6,
+    chemsex_sub1_1, chemsex_sub1_2, chemsex_sub1_3, chemsex_sub2_1, chemsex_sub2_2, 
+    chemsex_sub2_3, chemsex_sub2_4, chemsex_sub2_5, chemsex_sub2_6, chemsex_sub2_7, 
+    chemsex_sub2_8, chemsex_sub2_9, chemsex_sub2_10, chemsex_sub2_11, chemsex_sub2_12, 
+    sub_nosex, sub_type_2, sub_type_3, sub_type_4, sub_type_5, sub_type_6, 
+    sub_type_7, sub_type_8, sub_type_9, sub_type_10, sub_type_11, 
+    Q45_1, Q45_2, Q45_3, Q45_4, Q45_5, 
+    other,
+    insertive_new, oral_new, masturbation_new, finger_new, anal_new, 
+    intercrural_new, kink_new, insertive_toy, oral_toy, masturbation_toy, 
+    finger_toy, petting_toy, anal_toy, intercrural_toy, kink_toy, insertive_lube, 
+    oral_lube, masturbation_lube, finger_lube, anal_lube, petting_lube, 
+    intercrural_lube, kink_lube, insertive_prot, oral_prot, masturbation_prot, 
+    finger_prot, anal_prot, kink_prot, insertive_partner, oral_partner, 
+    masturbation_partner, finger_partner, anal_partner, petting_partner, 
+    intercrural_partner, kink_partner, insertive_occasional, oral_occasional, 
+    masturbation_occasional, finger_occasional, anal_occasional, petting_occasional, 
+    intercrural_occasional, kink_occasional,
+    insertive_wsw, oral_wsw, masturbation_wsw, finger_wsw, anal_wsw, 
+    petting_wsw, intercrural_wsw, kink_wsw, 
+    Exp_Index, toy_index, lube_index, prot_index, partner_index, 
+    occasion_index, wsw_index
+    ) %>%
+  #compute petting (multiple choice)
+  rename(
+    petting_noinsertive = petting_1,
+    petting_foreplay = petting_2) %>%
+  #rename variables
+  rename(
+    substances_1 = Q45_1,
+    substances_2 = Q45_2,
+    substances_3 = Q45_3,
+    substances_4 = Q45_4,
+    substances_5 = Q45_5,
+    ) %>%
+  #recode values
+  mutate(
+    age = as.numeric(age) + 16,
+    self_def = case_when(
+      self_def == 1 ~ "lesbian",
+      self_def == 2 ~ "bisexual",
+      self_def == 3 ~ "etero",
+    )
+  ) %>%
+  #recode yes and no
+  mutate(
+    insertive = recode_01(vct = insertive),
+    oral = recode_01(vct = oral),
+    masturbation = recode_01(vct = masturbation),
+    finger = recode_01(vct = finger),
+    anal = recode_01(vct = anal),
+    intercrural = recode_01(vct = intercrural),
+  ) %>%
+  #replace missings as "no"
+  replace_na(list(petting_noinsertive = 0, petting_foreplay = 0, finger = 0))
+```
+
+## Sociodemographics  
+
+```{r}
+#tidying for sociodemo
+dat <- dat %>%
+  mutate(
+    edu = case_when(
+      edu == 1 ~ "1_elementary school",
+      edu == 2 ~ "2_middle school",
+      edu == 3 ~ "3_professional certificate",
+      edu == 4 ~ "4_high school",
+      edu == 5 ~ "5_degree",
+      edu == 6 ~ "6_other",
+      edu == 7 ~ "7_don't want to answer",),
+    relation = case_when(
+      relation == 1 ~ "1_monogamy",
+      relation == 2 ~ "2_enm",
+      relation == 3 ~ "3_enm_nonconsensual",
+      relation == 4 ~ "4_single",
+      relation == 5 ~ "5_single_enm",
+      relation == 6 ~ "6_none",
+      relation == 7 ~ "7_other",),
+    sex_attr = case_when(
+      sex_attr == 1 ~ "1_exclusively women",
+      sex_attr == 2 ~ "2_mostly women, occasionally men",
+      sex_attr == 3 ~ "3_mostly women, substantially men",
+      sex_attr == 4 ~ "4_equally",
+      sex_attr == 5 ~ "5_mostly men, substantially women",
+      sex_attr == 6 ~ "6_mostly men, occasionally women",
+      sex_attr == 7 ~ "7_exclusively men",
+      sex_attr == 8 ~ "8_neither",
+      sex_attr == 9 ~ "9_gender is irrelevant",
+      sex_attr == 10 ~ "10_other",
+      sex_attr == 11 ~ "11_don't want to answer",),
+    rom_attr = case_when(
+      rom_attr == 1 ~ "1_exclusively women",
+      rom_attr == 2 ~ "2_mostly women, occasionally men",
+      rom_attr == 3 ~ "3_mostly women, substantially men",
+      rom_attr == 4 ~ "4_equally",
+      rom_attr == 5 ~ "5_mostly men, substantially women",
+      rom_attr == 6 ~ "6_mostly men, occasionally women",
+      rom_attr == 7 ~ "7_exclusively men",
+      rom_attr == 8 ~ "8_neither",
+      rom_attr == 9 ~ "9_gender is irrelevant",
+      rom_attr == 10 ~ "10_other",
+      rom_attr == 11 ~ "11_don't want to answer",),
+    )
+```
+
+Age  
+
+```{r}
+c(summary(dat$age)[c("Min.", "Max.", "Mean")], "Sd" = sd(dat$age)) %>%
+  round(digits = 2)
+```
+
+Education  
+
+```{r}
+eduDesc <- rbind(table(dat$edu),
+      round((table(dat$edu) / nrow(dat)) * 100, digits = 2)) %>%
+  t()
+colnames(eduDesc) <- c("absolute frequency", "relative frequency")
+eduDesc
+```
+
+Relationship  
+
+```{r}
+relDesc <- rbind(table(dat$relation),
+                 round((table(dat$relation) / nrow(dat)) * 100, digits = 2)) %>%
+  t()
+colnames(relDesc) <- c("absolute frequency", "relative frequency")
+relDesc
+```
+
+Sexual attraction  
+
+```{r}
+attrDesc <- rbind(table(dat$sex_attr), 
+                  round((table(dat$sex_attr) / nrow(dat)) * 100, digits = 2)) %>% 
+  t()
+colnames(attrDesc) <- c("absolute frequency", "relative frequency")
+attrDesc
+```
+
+Ad-hoc: Sexual attraction
+
+```{r}
+attrDesc_adhoc <- dat %>%
+  mutate(
+    sex_attr = case_when(
+      sex_attr == "1_exclusively women" ~ "1_leaning toward women",
+      sex_attr == "2_mostly women, occasionally men" ~ "1_leaning toward women",
+      sex_attr == "3_mostly women, substantially men" ~ "1_leaning toward women",
+      sex_attr == "4_equally" ~ "4_equally",
+      sex_attr == "5_mostly men, substantially women" ~ "5_leaning toward men",
+      sex_attr == "6_mostly men, occasionally women" ~ "5_leaning toward men",
+      sex_attr == "7_exclusively men" ~ "5_leaning toward men",
+      sex_attr == "8_neither" ~ "8_neither",
+      sex_attr == "9_gender is irrelevant" ~ "9_gender is irrelevant",
+      sex_attr == "10_other" ~ "10_other",
+      sex_attr == "11_don't want to answer" ~ "11_don't want to answer")) %>%
+  dplyr::select(sex_attr)
+attrDesc_adhoc <- rbind(table(attrDesc_adhoc$sex_attr), 
+                  round((table(attrDesc_adhoc$sex_attr) / nrow(attrDesc_adhoc)) * 100, digits = 2)) %>% 
+  t()
+colnames(attrDesc_adhoc) <- c("absolute frequency", "relative frequency")
+attrDesc_adhoc
+```
+
+Romantic attraction  
+
+```{r}
+romDesc <- rbind(table(dat$rom_attr), 
+                  round((table(dat$rom_attr) / nrow(dat)) * 100, digits = 2)) %>% 
+  t()
+colnames(romDesc) <- c("absolute frequency", "relative frequency")
+romDesc
+```
+
+Ad-hoc: Romantic attraction
+
+```{r}
+romDesc_adhoc <- dat %>%
+  mutate(
+    rom_attr = case_when(
+      rom_attr == "1_exclusively women" ~ "1_exclusively women",
+      rom_attr == "2_mostly women, occasionally men" ~ "2_mostly women",
+      rom_attr == "3_mostly women, substantially men" ~ "2_mostly women",
+      rom_attr == "4_equally" ~ "4_equally",
+      rom_attr == "5_mostly men, substantially women" ~ "5_leaning toward men",
+      rom_attr == "6_mostly men, occasionally women" ~ "5_leaning toward men",
+      rom_attr == "7_exclusively men" ~ "5_leaning toward men",
+      rom_attr == "8_neither" ~ "8_neither",
+      rom_attr == "9_gender is irrelevant" ~ "9_gender is irrelevant",
+      rom_attr == "10_other" ~ "10_other",
+      rom_attr == "11_don't want to answer" ~ "11_don't want to answer")) %>%
+  dplyr::select(rom_attr)
+romDesc_adhoc <- rbind(table(romDesc_adhoc$rom_attr), 
+                  round((table(romDesc_adhoc$rom_attr) / nrow(romDesc_adhoc)) * 100, digits = 2)) %>% 
+  t()
+colnames(romDesc_adhoc) <- c("absolute frequency", "relative frequency")
+romDesc_adhoc
+```
+
+Sexual orientation  
+
+```{r}
+sexDesc <- rbind(table(dat$self_def),
+                 round((table(dat$self_def) / nrow(dat)) * 100, digits = 2)) %>%
+  t()
+colnames(sexDesc) <- c("absolute frequency", "relative frequency")
+sexDesc
+```
+
+
+## Inference on frequency in the population  
+
+Descriptive disaggregated  
+
+```{r}
+popul_pract_global <- dat %>%
+  dplyr::select(insertive, oral, masturbation, finger, anal,
+                intercrural, kink, petting_noinsertive, petting_foreplay) %>%
+  gather(key = "practice", value = "response") %>%
+  dplyr::filter(complete.cases(.)) %>%
+  group_by(practice, response) %>%
+  summarise(respCount = n()) %>%
+  ungroup() %>% 
+  mutate(
+    response = ifelse(response == 1, no = "no", yes = "yes")) %>%
+  spread(key = "response", value = "respCount", fill = 0) %>%
+  mutate(relative_incidence = ((yes / (yes + no)) * 100))
+popul_pract_global %>%
+  as.data.frame() %>%
+  mutate(relative_incidence = round(relative_incidence, digits = 2)) %>%
+  arrange(desc(relative_incidence))
+```
+
+Inference aggregated  
+
+```{r}
+#compute and store practice incidence
+popul_pract <- dat %>%
+  dplyr::select(self_def,
+                insertive, oral, masturbation, finger, anal,
+                intercrural, kink, petting_noinsertive, petting_foreplay) %>%
+  gather(key = "practice", value = "response", -self_def) %>%
+  dplyr::filter(complete.cases(.)) %>%
+  group_by(self_def, practice, response) %>%
+  summarise(respCount = n()) %>%
+  ungroup() %>% 
+  mutate(
+    response = ifelse(response == 1, no = "no", yes = "yes")) %>%
+  spread(key = "response", value = "respCount", fill = 0)
+popul_pract$populProp = popul_pract$yes / (popul_pract$yes + popul_pract$no)
+popul_pract$confInt_low <- NA
+popul_pract$confInt_up <- NA
+posteriorSamples <- list()
+set.seed(20230127)
+for(i in 1:nrow(popul_pract)){
+  #extract beta parameters
+  a = popul_pract[i, "yes"] %>% unlist() %>% unname()
+  b = popul_pract[i, "no"] %>% unlist() %>% unname()
+  #extract population features
+  grp = popul_pract[i, "self_def"] %>% unlist() %>% unname()
+  prtc = popul_pract[i, "practice"] %>% unlist() %>% unname()
+  #introduce .1 instead of 0
+  if(a == 0){a = .1}
+  if(b == 0){b = .1}
+  #simulated posterior
+  # generate a beta distribution
+  posterior_sim <- distribution_beta(n = 100000, shape1 = a, shape2 = b)
+  posterior_sim <- sample(x = posterior_sim,
+                          size = length(posterior_sim),
+                          replace = TRUE) #shuffle
+  # compute HDI
+  ci_hdi <- ci(x = posterior_sim, method = "HDI")
+  #store
+  popul_pract[i, "confInt_low"] = ci_hdi$CI_low
+  popul_pract[i, "confInt_up"] = ci_hdi$CI_high
+  posteriorSamples[[grp]][[prtc]] = posterior_sim
+  #clean
+  rm(a, b, grp, prtc, posterior_sim, ci_hdi)
+};rm(i)
+#visual
+ggplot(data = popul_pract,
+       aes(x = self_def, y = populProp,
+           ymax = confInt_up, ymin = confInt_low,
+           color = self_def)) +
+  geom_hline(yintercept = 1) +
+  facet_wrap(practice ~ .) +
+  geom_point() +
+  geom_errorbar(width = .25) +
+  scale_color_discrete(type = c("#eb9b34", "dark green", "#2828ed")) +
+  coord_cartesian(ylim = c(.04, .96)) +
+  scale_y_continuous(breaks = seq(from = 0, to = 1, by = .1)) +
+  labs(y = "proportion", x = "self identification") +
+  theme_pubclean() +
+  theme(panel.border = element_rect(color = "black", fill = NA),
+        legend.position = "none")
+incidencePlot <- ggplot(data = popul_pract %>%
+                          dplyr::filter(self_def != "etero") %>%
+                          mutate(
+                            practice = gsub(pattern = "_", replacement = " ", x = practice),
+                            practice = tools::toTitleCase(practice),
+                            practice = as.factor(practice),
+                            practice = fct_relevel(practice,
+                                                   "Insertive", "Oral", "Masturbation", "Finger", "Anal",
+                                                   "Petting Noinsertive", "Intercrural", "Kink", "Petting Foreplay"),
+                            practice = gsub(pattern = "Finger", replacement = "Other\nmasturbation", x = practice)),
+       aes(x = self_def, y = populProp,
+           ymax = confInt_up, ymin = confInt_low,
+           color = self_def)) +
+  geom_hline(yintercept = 1) +
+  facet_wrap(practice ~ .) +
+  geom_point() +
+  geom_errorbar(width = .25) +
+  scale_color_discrete(type = c("#eb9b34", "#2828ed")) +
+  coord_cartesian(ylim = c(.04, .96)) +
+  scale_y_continuous(breaks = seq(from = 0, to = 1, by = .1)) +
+  labs(y = "proportion", x = "self identification") +
+  theme_pubclean() +
+  theme(panel.border = element_rect(color = "black", fill = NA),
+        legend.position = "none")
+```
+
+
+::::::::{.landscape data-latex=""}
+
+```{r}
+popul_pract %>%
+  dplyr::filter(self_def != "etero") %>%
+  as.data.frame() %>%
+  mutate_at(.vars = c("populProp", "confInt_low", "confInt_up"),
+            .funs = round, digits = 4, .cols = NULL) %>%
+  mutate(
+    confInt = paste0("[", confInt_low * 100, "%, ", confInt_up * 100, "%]"),
+    practice = gsub(pattern = "_", replacement = " ", x = practice),
+    practice = tools::toTitleCase(practice),
+    self_def = tools::toTitleCase(self_def)) %>%
+  dplyr::select(-confInt_low, -confInt_up) %>%
+  rename(
+    `Self-Definition` = self_def,
+    Practice = practice,
+    `Incidence` = populProp,
+    `CI95%` = confInt) %>%
+  mutate(
+    Incidence = as.character(Incidence * 100),
+    Incidence = paste0(Incidence, "%")) %>%
+  rename(Frequency = yes) %>%
+  dplyr::select(-no) %>%
+  pivot_wider(names_from = "Self-Definition", values_from = c(Frequency, Incidence, `CI95%`)) %>%
+  dplyr::select(
+    "Practice", 
+    "Frequency_Bisexual", "Incidence_Bisexual", "CI95%_Bisexual", 
+    "Frequency_Lesbian", "Incidence_Lesbian", "CI95%_Lesbian") %>%
+  apa(title = "Prevalence of Each Practice within Self-Definitions") %>%
+  tab_spanner(label = "Bisexual",
+              columns = c("Frequency_Bisexual", "Incidence_Bisexual", "CI95%_Bisexual"), replace = TRUE) %>%
+  tab_spanner(label = "Lesbian",
+              columns = c("Frequency_Lesbian", "Incidence_Lesbian", "CI95%_Lesbian"))
+```
+
+
+::::::::
+
+```{r}
+#fancy radar plot
+radarPlot <- popul_pract %>%
+  dplyr::filter(self_def != "etero") %>%
+  mutate(self_def = as.factor(self_def),
+         practice = as.factor(practice)) %>%
+  dplyr::select(self_def, practice, populProp) %>%
+  spread(key = "practice", value = "populProp") %>%
+  dplyr::select(
+    self_def,
+    insertive, oral, masturbation, finger, anal,
+    petting_noinsertive, intercrural, kink, petting_foreplay
+    ) %>%
+  ggradar(
+    #axis labels (to match variables order in the dataset)
+    axis.labels = 
+      c(
+        "Insertive", "Oral", "Masturbation", "Other\nmasturbation", "Anal",
+        "Petting Noinsertive", "Intercrural", "Kink", "Petting Foreplay"),
+    #colors
+    group.colours = c("#eb9b34", "#2828ed"),
+    #
+    grid.label.size = 5,  # Affects the grid annotations (0%, 50%, etc.)
+    axis.label.size = 3, # Afftects the names of the variables
+    group.point.size = 1, # Simply the size of the point
+    legend.text.size = 9,
+  ) +
+  theme(
+    legend.position = c(1, -.15),
+    legend.justification = c(1, 0),
+    legend.key = element_rect(fill = NA, color = NA),
+    legend.background = element_blank())
+radarPlot
+```
+
+```{r}
+#store plots
+png(filename = "descPlot.png", width = 800, height = 400)
+incidencePlot + scale_color_grey() + radarPlot + scale_color_grey()
+dev.off()
+```
+
+
+\newpage
+
+## Pairwise comparisons (sex-orientation within practice)  
+
+```{r}
+practices_pairwiseComp <- expand.grid(
+  "practice" = unique(popul_pract$practice),
+  "groupA" = c("bisexual", "lesbian"),
+  "groupB" = c("bisexual", "lesbian")) %>%
+  as_tibble() %>%
+  dplyr::filter(groupA != groupB) %>%
+  arrange(practice) %>%
+  mutate(
+    compar = paste(groupA, groupB, sep = "-"),
+    map_central = NA,
+    confInt_low = NA, 
+    confInt_up = NA, 
+    BF_ab = NA)
+for(i in 1:nrow(practices_pairwiseComp)){
+  #extract info
+  prct <- practices_pairwiseComp[i, "practice"] %>% unlist() %>% as.character() %>% unname()
+  gA <- practices_pairwiseComp[i, "groupA"] %>% unlist() %>% as.character() %>% unname()
+  gB <- practices_pairwiseComp[i, "groupB"] %>% unlist() %>% as.character() %>% unname()
+  #compute posterior of the difference
+  posterior_diff <- posteriorSamples[[gA]][[prct]] - posteriorSamples[[gB]][[prct]] 
+  #compute ci
+  diffCi <- ci(x = posterior_diff, method = "HDI")
+  diffMap <- map_estimate(posterior_diff)
+  #compute BF (proportion of samples above 0 / proportion of samples below 0)
+  bf <- mean(posterior_diff > 0) / mean(posterior_diff <= 0)
+  #store
+  practices_pairwiseComp[i, "map_central"] <- diffMap%>% as.numeric() %>% round(digits = 2)
+  practices_pairwiseComp[i, "confInt_low"] <- diffCi$CI_low
+  practices_pairwiseComp[i, "confInt_up"] <- diffCi$CI_high
+  practices_pairwiseComp[i, "BF_ab"] <- bf
+  #clean
+  rm(prct, gA, gB, posterior_diff, diffCi, bf, diffMap)
+};rm(i)
+practices_pairwiseComp <- practices_pairwiseComp %>%
+         mutate(compar_lab = paste0(compar, " (BF=", round(x = BF_ab, digits = 2), ")"),
+                practice = gsub(pattern = "_", replacement = " ", x = practice),
+                practice = tools::toTitleCase(practice),
+                compar_lab = gsub(pattern = "=Inf", replacement = "=100000", x = compar_lab))
+bfPlot <- ggplot(data = practices_pairwiseComp %>%
+                   mutate(
+                     practice = gsub(pattern = "_", replacement = " ", x = practice),
+                     practice = tools::toTitleCase(practice),
+                     practice = as.factor(practice),
+                     practice = fct_relevel(practice,
+                                            "Insertive", "Oral", "Masturbation", "Finger", "Anal",
+                                            "Petting Noinsertive", "Intercrural", "Kink", "Petting Foreplay"),
+                     practice = gsub(pattern = "Finger", replacement = "Other-masturbation",
+                                     x = practice)),
+       aes(y = compar_lab, x = map_central,
+           xmax = confInt_up, xmin = confInt_low)) +
+  geom_point() +
+  geom_errorbar(width = .25) +
+  geom_vline(xintercept = 0, lty = "dashed") +
+  scale_x_continuous(breaks = seq(from = -1, to = 1, by = .1)) +
+  facet_wrap(practice ~ ., scales = "free_y", ncol = 1) +
+  labs(y = "comparison", x = "posterior difference") +
+  theme_pubclean() +
+  theme(panel.border = element_rect(color = "black", fill = NA))
+bfPlot
+```
+
+```{r}
+png(filename = "bayesFactors.png", width = 600, height = 600)
+bfPlot
+dev.off()
+```
+
+\newpage
+
+```{r}
+practices_pairwiseComp %>%
+  dplyr::filter(compar == "lesbian-bisexual") %>%
+  as.data.frame() %>%
+  dplyr::select(-groupA, -groupB) %>%
+  mutate(
+    confInt_low = round(x = confInt_low, digits = 2),
+    confInt_up = round(x = confInt_up, digits = 2),
+    BF_ab = round(x = BF_ab, digits = 3),
+    BF_ba = round(x = 1 / BF_ab, digits = 3),
+    BF_ab = ifelse(test = is.infinite(BF_ab), yes = 100000, no = BF_ab),
+    BF_ba = ifelse(test = is.infinite(BF_ba), yes = 100000, no = BF_ba),
+    BF_ab = round(BF_ab, digits = 2),
+    BF_ba = round(BF_ba, digits = 2),
+  ) %>%
+  mutate(
+    confInt = paste0("[", confInt_low, ", ", confInt_up, "]"),
+    practice = gsub(pattern = "_", replacement = " ", x = practice),
+    practice = tools::toTitleCase(practice),
+    compar = gsub(pattern = "-", replacement = " ", x = compar),
+    compar = tools::toTitleCase(compar),
+    compar = gsub(pattern = " ", replacement = "-", x = compar)) %>%
+  dplyr::select(-confInt_low, -confInt_up, -compar) %>%
+  dplyr::select(practice, map_central, confInt, BF_ab, BF_ba) %>%
+  rename(
+    Practice = practice,
+    MAP = map_central,
+    Difference = confInt,
+    `BF [LB]` = BF_ab,
+    `BF [BL]` = BF_ba) %>%
+  apa(title = "Posterior Differences of Pairwise Comparisons across Self-Definitions") %>%
+  tab_footnote(footnote = "Posterior Distributions (and their differences) are based on 100000 draws. If all draws of one distribution are above (or below) the draws from the other distribution, the Bayes Factor is assumed to be exactly the number of draws (or 0).")
+```
+
+\newpage
+
+## Networks
+
+```{r}
+#create dataset
+tidyDat <- dat %>%
+  dplyr::filter(self_def != "etero") %>% #exclude etero (too few obs)
+  dplyr::select(self_def, relation,
+                insertive, oral, masturbation, finger, anal,
+                intercrural, kink, petting_noinsertive, petting_foreplay) %>%
+  mutate(
+    relation = gsub(pattern = "[0-9]_", replacement = "", x = relation))
+#explore near-zero variance variables
+tidyDat %>% 
+  dplyr::select(-relation) %>%
+  group_by(self_def) %>%
+  summarise(
+    insertive = var(insertive) %>% round(digits = 2),
+    oral = var(oral) %>% round(digits = 2),
+    masturbation = var(masturbation) %>% round(digits = 2),
+    finger = var(finger) %>% round(digits = 2),
+    anal = var(anal) %>% round(digits = 2),
+    intercrural = var(intercrural) %>% round(digits = 2),
+    kink = var(kink) %>% round(digits = 2),
+    petting_noinsertive = var(petting_noinsertive) %>% round(digits = 2),
+    petting_foreplay = var(petting_foreplay) %>% round(digits = 2))
+```
+
+masturbation and oral have near-zero variance in one of the two groups
+
+```{r}
+#split datasets into groups
+biDat_all <- tidyDat %>% dplyr::filter(self_def == "bisexual") %>%
+  dplyr::select(-masturbation, -oral) %>% #near-zero variance
+  dplyr::select(-self_def, -relation) %>%
+    rename(
+      "Insertive" = insertive,
+      "Finger" = finger,
+      "Anal" = anal,
+      "Petting Noinsertive" = petting_noinsertive,
+      "Intercrural" = intercrural, 
+      "Kink" = kink,
+      "Petting Foreplay" = petting_foreplay) %>%
+  dplyr::select(
+    "Insertive", "Finger", "Anal", "Petting Noinsertive", 
+    "Intercrural", "Kink", "Petting Foreplay")
+lesbianDat_all <- tidyDat %>% dplyr::filter(self_def == "lesbian") %>%
+  dplyr::select(-masturbation, -oral) %>% #near-zero variance
+  dplyr::select(-self_def, -relation) %>%
+    rename(
+      "Insertive" = insertive,
+      "Finger" = finger,
+      "Anal" = anal,
+      "Petting Noinsertive" = petting_noinsertive,
+      "Intercrural" = intercrural, 
+      "Kink" = kink,
+      "Petting Foreplay" = petting_foreplay) %>%
+  dplyr::select(
+    "Insertive", "Finger", "Anal", "Petting Noinsertive", 
+    "Intercrural", "Kink", "Petting Foreplay")
+#subset groups
+biDat <- biDat_all %>% dplyr::select(Finger, Kink, Intercrural)
+lesbianDat <- lesbianDat_all %>% dplyr::select(Finger, Kink, Intercrural)
+#fit networks
+biIsing <- IsingFit(x = biDat, AND = FALSE, plot = FALSE) #fit Ising model (for binary data)
+lesbianIsing <- IsingFit(x = lesbianDat, AND = FALSE, plot = FALSE) #fit Ising model (for binary data)
+#plot networks
+layout(t(1:2)) #set layout
+biNet_plot <- qgraph(biIsing$q,
+                     layout = "circular",
+                     labels = biIsing$weiadj %>% colnames(),
+                     edge.labels = TRUE,
+                     edge.label.cex = 1.5, label.cex = 1.5,
+                     labels = tools::toTitleCase(gsub(pattern = "_", replacement = "\n", x = biIsing$q$labels))) %>%
+  plot()
+title("Bisexual", adj = 0.5, line = 2)
+lesbianNet_plot <- qgraph(lesbianIsing$q,
+                          layout = "circular",
+                          labels = lesbianIsing$weiadj %>% colnames(),
+                          edge.labels = TRUE,
+                          edge.label.cex = 1.5, label.cex = 1.5,
+                          labels = tools::toTitleCase(gsub(pattern = "_", replacement = "\n", x = lesbianIsing$q$labels))) %>%
+  plot()
+title("Lesbian", adj = 0.5, line = 2)
+```
+
+```{r}
+#store network image
+png(filename = "networks.png", width = 1000, height = 600)
+par(cex.main = 2.5)
+layout(t(1:2)) #set layout
+biNet_plot <- qgraph(biIsing$q,
+                     layout = "circular",
+                     labels = c("Other\nmasturbation", "Kink", "Intercrural"),
+                     edge.labels = TRUE,
+                     edge.label.cex = 1.5, label.cex = 2, edge.color = "darkgrey",
+                     labels = tools::toTitleCase(gsub(pattern = "_", replacement = "\n", x = biIsing$q$labels))) %>%
+  plot()
+title("Bisexual", adj = 0.5, line = 2.25)
+lesbianNet_plot <- qgraph(lesbianIsing$q,
+                          layout = "circular",
+                          labels = c("Other\nmasturbation", "Kink", "Intercrural"),
+                          edge.labels = TRUE,
+                          edge.label.cex = 1.5, label.cex = 2, edge.color = "darkgrey",
+                          labels = tools::toTitleCase(gsub(pattern = "_", replacement = "\n", x = lesbianIsing$q$labels))) %>%
+  plot()
+title("Lesbian", adj = 0.5, line = 2.25)
+dev.off()
+```
+
+
+Network Comparison Test.  
+
+$$H_{0}: same \space \space connectivity$$  
+  
+$$H_{1}: different \space \space connectivity$$  
+  
+  
+```{r}
+biLesbo_nct <- NetworkComparisonTest::NCT(
+  data1 = biDat, data2 = lesbianDat,
+  test.centrality = TRUE,
+  test.edges = TRUE,
+  it = 1000, binary.data = TRUE)
+```
+
+Results
+
+```{r}
+biLesbo_nct
+```
+
+Based on the Network Comparison Test (global strength invariance), the two networks have the same connectivity.  
+
+\newpage
+
+## Test individual edges across networks  
+
+```{r}
+biLesbo_nct$einv.pvals %>% 
+  mutate(
+    p_adj = p.adjust(p = `p-value`, method = "bonferroni"),
+    p_adj = round(p_adj, digits = 2),
+    `p-value` = round(`p-value`, digits = 2),
+    Var1 = tools::toTitleCase(gsub(pattern = "_", replacement = " ", x = Var1)),
+    Var2 = tools::toTitleCase(gsub(pattern = "_", replacement = " ", x = Var2)),
+    ) %>%
+  arrange(Var1, Var2) %>%
+  rename(
+    `Variable 1` = Var1,
+    `Variable 2` = Var2,
+    `Adj. p-value` = p_adj) %>%
+  apa(title = "Edges Comparisons across Networks") %>%
+  tab_footnote(footnote = "P-values adjusted using Bonferroni correction.")
+```
+
+Even without multiple comparisons adjustment, no edge is significantly different across networks
