@@ -1,1 +1,132 @@
-SQoL_IHB
+title: "SQoL"
+author: "Sofia Pavanello Decaro"
+date: "2023-11-24"
+if(!require("pacman")) install.packages("pacman")
+library("pacman")
+install.packages("gvlma")
+library(gvlma)
+library(haven)
+library(ggplot2)
+library(car)
+install.packages("dplyr")
+library(dplyr)
+library(knitr)
+install.packages("officer")
+install.packages("flextable")
+library(officer)
+library(flextable)
+install.packages("officer", dependencies = TRUE)
+library(haven)
+WSW1 <- read_sav("WSW/WSW1.sav")
+View(WSW1)
+
+# Calculate the age mean and range bor bisexual and lesbian women
+# Subset the dataset
+lesbian_subset <- subset(WSW1, self_def == 1)
+bisexual_subset <- subset(WSW1, self_def == 2)
+
+# Calculate and print the mean and range for each subset
+cat("Lesbian women:\n")
+cat("Mean age:", mean(lesbian_subset$age_years), "\n")
+cat("Standard deviation of age:", sd(lesbian_subset$age_years), "\n")
+cat("Range of age:", range(lesbian_subset$age_years), "\n\n")
+cat("Bisexual women:\n")
+cat("Mean age:", mean(bisexual_subset$age_years), "\n")
+cat("Standard deviation of age:", sd(bisexual_subset$age_years), "\n")
+cat("Range of age:", range(bisexual_subset$age_years), "\n")
+t_test_age <- t.test(age_years ~ self_def, data = WSW1)
+print(t_test_age)
+
+#sociodemographic: education level
+edu_labels <- c(
+  "Elementary School",
+  "Middle School",
+  "Professional Diploma",
+  "High School Diploma",
+  "University Degree or Above",
+  "Other",
+  "Prefer Not to Answer"
+)
+# Function to calculate percentage
+> calculate_percentage <- function(table) {
+  + 	prop.table(table) * 100
+  + }
+>
+# Table for education levels among lesbian women (self_def == 1)
+edu_lesbian <- table(factor(WSW1$edu[WSW1$self_def == 1], levels = 1:7, labels = edu_labels))
+edu_lesbian_percentage <- calculate_percentage(edu_lesbian)
+__
+# Define the labels for education levels
+edu_labels <- c(
+  "Elementary School",
+  "Middle School",
+  "Professional Diploma",
+  "High School Diploma",
+  "University Degree or Above",
+  "Other",
+  "Prefer Not to Answer"
+)
+	# Function to calculate percentage
+calculate_percentage <- function(table) {
+  prop.table(table) * 100
+}
+	# Table for education levels among lesbian women (self_def == 1)
+edu_lesbian <- table(factor(WSW1$edu[WSW1$self_def == 1], levels = 1:7, labels = edu_labels))
+edu_lesbian_percentage <- calculate_percentage(edu_lesbian)
+cat("Education levels for lesbian women:\n", edu_lesbian, "\n")
+cat("Percentage:\n", round(edu_lesbian_percentage, 2), "\n\n")
+	# Table for education levels
+edu_bisexual <- table(factor(WSW1$edu[WSW1$self_def == 2], levels = 1:7, labels = edu_labels))
+edu_bisexual_percentage <- calculate_percentage(edu_bisexual)
+cat("Education levels for bisexual women:\n", edu_bisexual, "\n")
+cat("Percentage:\n", round(edu_bisexual_percentage, 2), "\n")
+_
+
+# relationship status
+lesbian_relation_freq <- table(lesbian_subset$relation)
+bisexual_relation_freq <- table(bisexual_subset$relation)
+print("Lesbian Relationship Status Frequency:")
+print(lesbian_relation_freq)
+
+print("Bisexual Relationship Status Frequency:")
+print(bisexual_relation_freq)
+# select only lesbian and bisexual respondents: Remove rows where self_def is not 1 or 2
+WSW1 <- filter(WSW1, self_def %in% c(1, 2))
+unique_levels_numeric <- unique(as.numeric(WSW1$self_def))
+print(unique_levels_numeric)
+
+# Check for missing values in self_def
+sum(is.na(WSW1$self_def))
+
+
+# T-test for SQoL_Sum
+t_test_SQoL <- t.test(SQoL_tot ~ self_def, data = WSW1)
+print(t_test_SQoL)
+
+# T-test for LIHS
+t_test_LIHS <- t.test(LIHS_tot ~ self_def, data = WSW1)
+print(t_test_LIHS)
+
+
+#  t-test results
+t_test_results <- data.frame(
+  Variable = c("Sexual Quality of Life (SQoL_Sum)", "Internalized Homonegativity (LIHS_sum)"),
+  Group_Comparison = c("Lesbian vs. Bisexual", "Lesbian vs. Bisexual"),
+
+# multiple regression
+model <- lm(SQoL_tot ~ age + LIHS_tot + self_def, data = WSW1)
+plot(model, which = 1)
+install.packages("ggplot2")  # If not already installed
+ggplot(data = WSW1, aes(x = predict(model), y = residuals(model))) +
+
+# Variance Inflation Factors (VIF)
+install.packages("car")  # If not already installed
+vif(model)
+
+summary_table <- summary(model)
+coefficient_table <- summary_table$coefficients
+options(scipen = 999)
+
+estimated_means <- coefficient_table[, "Estimate"]
+print(estimated_means)
+print(model)
